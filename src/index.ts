@@ -95,7 +95,7 @@ async function main(): Promise<void> {
     case "lake": {
       const [alvo, rede] = args;
       if (!alvo) throw new Error("Uso: lake <ledger|--date YYYY-MM-DD> [pubnet|testnet]");
-      const network = rede === "testnet" ? "testnet" : "pubnet";
+      const network = (alvo === "--date" ? args[2] : rede) === "testnet" ? "testnet" : "pubnet";
       const { readLedger, findLedgerByDate, printLedger } = await import("./lake.js");
 
       let sequence: number;
@@ -105,7 +105,7 @@ async function main(): Promise<void> {
         const date = new Date(`${iso}T00:00:00Z`);
         if (Number.isNaN(date.getTime())) throw new Error(`Data inválida: ${iso}`);
         console.log(`Procurando o primeiro ledger de ${iso} por busca binária no lake…`);
-        sequence = await findLedgerByDate(date, args[2] === "testnet" ? "testnet" : "pubnet");
+        sequence = await findLedgerByDate(date, network);
       } else {
         sequence = Number(alvo);
         if (!Number.isInteger(sequence) || sequence < 2) {
