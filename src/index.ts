@@ -41,6 +41,8 @@ async function main(): Promise<void> {
       const [contractId, key, durability] = args;
       if (!contractId) throw new Error("Uso: read <contractId> <chave> [durability] | --instance");
 
+      if (!key) throw new Error("Uso: read <contractId> <chave> [durability] | --instance");
+
       // O espaço de instância não é endereçado por chave — vem inteiro.
       if (key === "--instance" || key === "instance") {
         const { readInstance } = await import("./read.js");
@@ -56,8 +58,8 @@ async function main(): Promise<void> {
         break;
       }
 
-      if (!key) throw new Error("Uso: read <contractId> <chave> [durability] | --instance");
       const { read } = await import("./read.js");
+      
       const result = await read(contractId, key, (durability as Durability) ?? "persistent");
       console.log(
         result.found
