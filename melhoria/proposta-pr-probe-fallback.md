@@ -1,3 +1,12 @@
+# Proposta de Pull Request: Diagnóstico Híbrido & Fallback do Data Lake no `probe.ts`
+
+Esta proposta de melhoria conecta diretamente os conceitos da **Aula 1 (Arquitetura de Dados Quentes vs. Frios)** com a engenharia prática do **Stellar Watch**. Ela transforma o comando `probe` em um assistente de diagnóstico inteligente, auxiliando o desenvolvedor a entender onde seus dados estão e como recuperá-los de forma resiliente.
+
+---
+
+## 🛠️ O Código Alterado (`src/probe.ts`)
+
+Aqui está a implementação completa e atualizada do arquivo `probe.ts` em TypeScript, utilizando o **`fetch` nativo do Node 22** e gerenciamento resiliente de timeouts via **`AbortC```typescript
 /**
  * A primeira coisa que você roda contra QUALQUER provedor novo.
  *
@@ -130,3 +139,4 @@ async function hasDeepHistory(oldestLedger: number): Promise<boolean> {
     return false;
   }
 }
+```

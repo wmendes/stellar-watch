@@ -83,11 +83,10 @@ linha do `.env`.
 e polling contra provedor com rate limit exige backoff. Exponencial com jitter,
 porque sem jitter N clientes que tomaram 429 juntos voltam juntos.
 
-**`probe.ts`** — a primeira coisa a rodar contra qualquer provedor novo. Não
-existe "a janela de retenção do RPC": existe a janela **daquela instância**, e
-`oldestLedger` é o limite inferior do que se pode perguntar. O `probe` ainda
-tenta um `getLedgers` abaixo dele: se voltar `-32600`, aquela instância não tem
-data lake configurado.
+**`probe.ts`** — a primeira coisa a rodar contra qualquer provedor novo. Realiza
+um **diagnóstico híbrido**:
+1. **Dados Quentes (RPC):** Sonda a retenção em memória daquela instância (`oldestLedger` até `latestLedger`).
+2. **Dados Frios (Data Lake):** Testa se o RPC fura a janela com archive integrado (`getLedgers`). Se o RPC não possuir data lake acoplado (erro `-32600`), o comando testa a conectividade direta com o bucket público do Data Lake na AWS S3 (`aws-public-blockchain.s3.amazonaws.com`) e instrui o uso do comando `pnpm run lake <ledger>` para consultas históricas.
 
 **`read.ts`** — você monta a **chave**, não uma query. E são **três** tipos de
 storage, não dois: `persistent` e `temporary` guardam cada chave como uma ledger
