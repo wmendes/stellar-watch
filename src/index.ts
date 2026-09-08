@@ -17,6 +17,12 @@ stellar-watch — monitor de pagamentos Stellar
   fund <publicKey>                           friendbot (Testnet/Futurenet)
   lake <ledger|--date YYYY-MM-DD> [rede]     lê um ledger do data lake público
                                              (rede: pubnet | testnet · +opção --xdr)
+  poll [--para <G...>] [--agora] [--ciclos N] [contractId]
+                                             monitora transfers com cursor durável
+                                             (--agora reproduz a perda de eventos)
+  ledgers <startLedger> [limite]             faixa de ledgers via RPC getLedgers
+  cursor                                     mostra o cursor salvo
+  cursor --reset                             apaga o cursor salvo
 
 Rede e credenciais vêm do .env — veja .env.example.
 `;
@@ -121,6 +127,41 @@ async function main(): Promise<void> {
         break;
       }
       printLedger(ledger, args.includes("--txs") ? -1 : 10);
+      break;
+    }
+
+    case "poll": {
+      const { poll } = await import("./poll.js");
+      const ciclos = args.indexOf("--ciclos");
+      const para = args.indexOf("--para");
+      await poll({
+        fromNow: args.includes("--agora"),
+        maxCycles: ciclos >= 0 ? Number(args[ciclos + 1]) : undefined,
+        to: para >= 0 ? args[para + 1] : undefined,
+        contractIds: args.filter((a) => a.startsWith("C") && a.length === 56),
+      });
+      break;
+    }
+
+    case "ledgers": {
+      const [start, limite] = args;
+      if (!start) throw new Error("Uso: ledgers <startLedger> [limite]");
+      const { readLedgers, printLedgers } = await import("./ledgers.js");
+      printLedgers(await readLedgers(Number(start), limite ? Number(limite) : 3));
+      break;
+    }
+
+    case "cursor": {
+      const { config } = await import("./config.js");
+      const { loadCursor, cursorPath, clearCursor } = await import("./cursor.js");
+      if (args.includes("--reset")) {
+        clearCursor(config.network);
+        console.log("Cursor apagado:", cursorPath(config.network));
+        break;
+      }
+      const state = loadCursor(config.network);
+      console.log("Arquivo:", cursorPath(config.network));
+      console.log(state ?? "(nenhum cursor salvo)");
       break;
     }
 

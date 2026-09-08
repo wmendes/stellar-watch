@@ -59,6 +59,10 @@ pnpm run pay <destino> <valor> [ativo] [memo]
 pnpm run fund <publicKey>                        # friendbot (Testnet/Futurenet)
 pnpm run lake <ledger> [pubnet|testnet] [--txs|--xdr]
 pnpm run lake --date 2023-01-01                  # acha o ledger daquela data
+pnpm run poll [--para <G...>] [--ciclos N]       # monitora transfers, cursor durável
+pnpm run poll --agora                            # reproduz a perda de eventos
+pnpm run ledgers <startLedger> [limite]          # faixa de ledgers via getLedgers
+pnpm run cursor [--reset]                        # estado do cursor de leitura
 pnpm run typecheck
 ```
 
@@ -107,6 +111,24 @@ passa por `simulateTransaction` (o método serve a uma operação Soroban);
 transferência de token passa **sempre**, porque é assim que o modelo de fees do
 Soroban funciona. `sendTransaction` devolve `PENDING`, nunca o resultado — e o
 loop de espera tem timeout, backoff e distingue `NOT_FOUND` de `FAILED`.
+
+**`poll.ts` + `cursor.ts`** — monitor de pagamentos por polling de eventos
+`transfer`. O cursor de leitura é persistido em `.stellar-watch/`, por rede, com
+escrita atômica, e só avança **depois** do processamento: salvar antes perde
+exatamente o que estava sendo tratado num crash. O `--agora` existe para
+demonstrar a falha oposta — retomar do presente em vez do último registro
+processado, que faz eventos desaparecerem sem erro nenhum; ele não grava cursor,
+então a demonstração é repetível.
+
+Duas armadilhas tratadas aqui: o `value` de um evento `transfer` vem como i128
+**ou** como mapa `{ amount, to_muxed_id }` quando o destino é muxed ou a
+transação leva memo — quem trata só o primeiro caso descarta o segundo em
+silêncio. E o cursor devolvido pelo `getEvents` marca o **fim da faixa varrida**,
+não o último evento, então a posição é derivada do TOID do cursor, não do evento.
+
+**`ledgers.ts`** — `getLedgers` é o único método do RPC que enxerga além da
+janela de retenção, via data lake do provedor. Se a instância não tiver archive,
+devolve `-32600`, e o erro aponta para o `lake` como alternativa.
 
 **`lake.ts`** — o caminho que **não** passa pelo RPC. Baixa o arquivo de um
 ledger direto do bucket público da AWS e o decodifica localmente, o que permite

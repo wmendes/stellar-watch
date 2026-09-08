@@ -1,6 +1,12 @@
 node_modules/
 dist/
 
+# estado local do monitor (cursor de leitura)
+.stellar-watch/
+
+# material de aula: não versionado
+aulas/
+
 # pnpm
 .pnpm-store/
 .pnpm-debug.log*

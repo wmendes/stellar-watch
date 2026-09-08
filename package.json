@@ -19,6 +19,9 @@
     "pay": "tsx src/index.ts pay",
     "fund": "tsx src/index.ts fund",
     "lake": "tsx src/index.ts lake",
+    "poll": "tsx src/index.ts poll",
+    "ledgers": "tsx src/index.ts ledgers",
+    "cursor": "tsx src/index.ts cursor",
     "watch": "tsx src/index.ts",
     "typecheck": "tsc --noEmit",
     "build": "tsc"
