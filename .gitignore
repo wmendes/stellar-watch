@@ -6,6 +6,7 @@ dist/
 
 # material de aula: não versionado
 aulas/
+.aula/
 
 # pnpm
 .pnpm-store/

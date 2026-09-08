@@ -59,7 +59,8 @@ pnpm run pay <destino> <valor> [ativo] [memo]
 pnpm run fund <publicKey>                        # friendbot (Testnet/Futurenet)
 pnpm run lake <ledger> [pubnet|testnet] [--txs|--xdr]
 pnpm run lake --date 2023-01-01                  # acha o ledger daquela data
-pnpm run poll [--para <G...>] [--ciclos N]       # monitora transfers, cursor durável
+pnpm run poll [--para <G...>] [--intervalo S]    # monitora até Ctrl+C
+pnpm run poll --para <G...> --ciclos 1           # uma leitura só
 pnpm run poll --agora                            # reproduz a perda de eventos
 pnpm run ledgers <startLedger> [limite]          # faixa de ledgers via getLedgers
 pnpm run cursor [--reset]                        # estado do cursor de leitura

@@ -17,7 +17,7 @@
 import * as StellarSdk from "@stellar/stellar-sdk";
 import { config, rpc } from "./config.js";
 import { type CursorState, loadCursor, saveCursor } from "./cursor.js";
-import { sleep, withRetry } from "./retry.js";
+import { withRetry } from "./retry.js";
 
 /** Eventos de `transfer` cobrem pagamento clássico e transferência via SAC. */
 const TRANSFER_TOPIC = StellarSdk.xdr.ScVal.scvSymbol("transfer").toXdr("base64");
@@ -30,8 +30,9 @@ export interface PollOptions {
    * é a diferença entre receber os eventos da rede toda e receber os seus.
    */
   to?: string;
+  /** Espera entre um ciclo e o próximo. Padrão 5 s, o ritmo de um ledger. */
   intervalMs?: number;
-  /** Encerra após N ciclos. Sem isso, roda até Ctrl+C. */
+  /** Encerra após N ciclos. Sem isso, roda indefinidamente até Ctrl+C. */
   maxCycles?: number;
   /**
    * `true` retoma do ledger atual, descartando o cursor salvo — a falha que
@@ -120,6 +121,24 @@ export function ledgerOfCursor(cursor: string): number | null {
   }
 }
 
+/**
+ * Espera que pode ser interrompida. Um `setTimeout` comum faz o Ctrl+C esperar
+ * o intervalo inteiro antes de agir — num monitor com intervalo de 30 s isso
+ * parece travamento. Aqui a interrupção acorda a espera na hora.
+ */
+function sleepUntil(ms: number, signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return Promise.resolve();
+  return new Promise((resolve) => {
+    const timer = setTimeout(finish, ms);
+    signal.addEventListener("abort", finish, { once: true });
+    function finish() {
+      clearTimeout(timer);
+      signal.removeEventListener("abort", finish);
+      resolve();
+    }
+  });
+}
+
 const short = (s: string): string => (s.length > 12 ? `${s.slice(0, 6)}…${s.slice(-4)}` : s);
 const xlm = (stroops: bigint): string => (Number(stroops) / 1e7).toFixed(7);
 
@@ -176,7 +195,28 @@ export async function poll(options: PollOptions = {}): Promise<void> {
   let state: CursorState | null = saved;
   let cycle = 0;
 
-  while (maxCycles === undefined || cycle < maxCycles) {
+  // Parada limpa: o Ctrl+C não mata no meio de um ciclo. Ele pede a parada, o
+  // ciclo em andamento termina, o cursor é gravado e só então saímos. É a
+  // diferença entre "o processo morreu" e "o processo encerrou" — e é o que
+  // garante que reiniciar retome exatamente de onde parou.
+  const controller = new AbortController();
+  let interrompido = false;
+  const onSigint = () => {
+    if (interrompido) process.exit(130); // segundo Ctrl+C: sai na marra
+    interrompido = true;
+    console.log("\n⏹  Encerrando: terminando o ciclo atual e gravando o cursor…");
+    controller.abort();
+  };
+  process.on("SIGINT", onSigint);
+
+  if (maxCycles === undefined) {
+    console.log(
+      `Monitorando a cada ${(intervalMs / 1000).toFixed(0)} s. Ctrl+C encerra sem perder posição.`,
+    );
+  }
+
+  try {
+  while (!interrompido && (maxCycles === undefined || cycle < maxCycles)) {
     cycle++;
 
     const response = await withRetry(
@@ -218,6 +258,18 @@ export async function poll(options: PollOptions = {}): Promise<void> {
         `ledger ${state?.ledger ?? "?"} · total ${total}`,
     );
 
-    if (maxCycles === undefined || cycle < maxCycles) await sleep(intervalMs);
+    if (!interrompido && (maxCycles === undefined || cycle < maxCycles)) {
+      await sleepUntil(intervalMs, controller.signal);
+    }
+  }
+  } finally {
+    process.off("SIGINT", onSigint);
+  }
+
+  if (interrompido) {
+    console.log(
+      `Encerrado no ledger ${state?.ledger ?? "?"} · ${state?.processed ?? 0} transfer(s) ` +
+        `processados. Rode o mesmo comando para retomar daqui.`,
+    );
   }
 }

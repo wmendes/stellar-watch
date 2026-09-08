@@ -17,8 +17,9 @@ stellar-watch — monitor de pagamentos Stellar
   fund <publicKey>                           friendbot (Testnet/Futurenet)
   lake <ledger|--date YYYY-MM-DD> [rede]     lê um ledger do data lake público
                                              (rede: pubnet | testnet · +opção --xdr)
-  poll [--para <G...>] [--agora] [--ciclos N] [contractId]
-                                             monitora transfers com cursor durável
+  poll [--para <G...>] [--intervalo S] [--ciclos N] [--agora] [contractId]
+                                             monitora transfers com cursor durável.
+                                             Sem --ciclos roda até Ctrl+C.
                                              (--agora reproduz a perda de eventos)
   ledgers <startLedger> [limite]             faixa de ledgers via RPC getLedgers
   cursor                                     mostra o cursor salvo
@@ -32,6 +33,41 @@ Rede e credenciais vêm do .env — veja .env.example.
 process.stdout.on("error", (error: NodeJS.ErrnoException) => {
   if (error.code !== "EPIPE") throw error;
 });
+
+/**
+ * Lê o valor de uma flag validando que ele existe e não é outra flag.
+ * Sem isto, `--para` sem valor engole o argumento seguinte e o erro só aparece
+ * lá dentro do SDK ("Unsupported address type: --ciclos") — inútil para quem
+ * está no terminal, e péssimo no meio de uma demonstração.
+ */
+function flagValue(args: string[], flag: string): string | undefined {
+  const i = args.indexOf(flag);
+  if (i < 0) return undefined;
+
+  const value = args[i + 1];
+  if (value === undefined || value.startsWith("--")) {
+    throw new Error(
+      `${flag} exige um valor${value ? ` (recebeu \`${value}\`, que é outra flag)` : ""}. ` +
+        `Se você usou uma variável, ela pode estar vazia: verifique com \`echo $VAR\`.`,
+    );
+  }
+  return value;
+}
+
+const requireAddress = (value: string, flag: string): string => {
+  if (!/^G[A-Z2-7]{55}$/.test(value)) {
+    throw new Error(`${flag} espera uma chave pública (G..., 56 caracteres). Recebeu: ${value}`);
+  }
+  return value;
+};
+
+const requirePositiveInt = (value: string, flag: string): number => {
+  const n = Number(value);
+  if (!Number.isInteger(n) || n < 1) {
+    throw new Error(`${flag} espera um inteiro positivo. Recebeu: ${value}`);
+  }
+  return n;
+};
 
 async function main(): Promise<void> {
   const [command, ...args] = process.argv.slice(2);
@@ -132,12 +168,15 @@ async function main(): Promise<void> {
 
     case "poll": {
       const { poll } = await import("./poll.js");
-      const ciclos = args.indexOf("--ciclos");
-      const para = args.indexOf("--para");
+      const ciclos = flagValue(args, "--ciclos");
+      const para = flagValue(args, "--para");
+      const intervalo = flagValue(args, "--intervalo");
       await poll({
         fromNow: args.includes("--agora"),
-        maxCycles: ciclos >= 0 ? Number(args[ciclos + 1]) : undefined,
-        to: para >= 0 ? args[para + 1] : undefined,
+        maxCycles: ciclos === undefined ? undefined : requirePositiveInt(ciclos, "--ciclos"),
+        to: para === undefined ? undefined : requireAddress(para, "--para"),
+        intervalMs:
+          intervalo === undefined ? undefined : requirePositiveInt(intervalo, "--intervalo") * 1000,
         contractIds: args.filter((a) => a.startsWith("C") && a.length === 56),
       });
       break;
